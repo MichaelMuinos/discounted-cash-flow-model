@@ -1,18 +1,14 @@
-from financial_modeling_prep.api_constants import Constants
+from financial_modeling_prep.constants import Constants
 
 class DiscountedCashFlowModel:
-    def __init__(self, financial_modeling_prep_api):
-        self.financial_modeling_prep_api = financial_modeling_prep_api
+    def __init__(self, return_percentage):
+        self.return_percentage = return_percentage
 
-    def calculate(self, ticker_symbols):
-        if ticker_symbols is None or len(ticker_symbols) == 0:
-            raise Exception("No ticker symbols given!")
+    def calculate(self, income_statement, balance_sheet, cash_flow_statement, symbol):
+        # step 1 : calculate free cash flow for however many years of data we have
+        free_cash_flow = self._calculate_free_cash_flow(symbol)
 
-        return [self._calculate(symbol) for symbol in ticker_symbols]
-
-    def _calculate(self, symbol):
-        # step 1: calculate free cash flow for however many years of data we have
-
+        # step 2 : determine future revenue estimates
 
     def _calculate_free_cash_flow(self, symbol):
         """
@@ -37,10 +33,16 @@ class DiscountedCashFlowModel:
         """            
         cash_flow_statement = self.financial_modeling_prep_api.get_cash_flow_statement(symbol)
 
+        # we could do warnings if we dont have say at least 4 years of data
+
         free_cash_flows = {}
         for year_financial in cash_flow_statement["financials"]:
             date = year_financial[Constants.CASH_FLOW_STATEMENT.DATE]
+            year = date.split("-")[0]
             free_cash_flow = year_financial[Constants.CASH_FLOW_STATEMENT.OPERATING_CASH_FLOW] - year_financial[Constants.CASH_FLOW_STATEMENT.CAPITAL_EXPENDITURE]
-            free_cash_flows[date] = free_cash_flow
+            free_cash_flows[int(date)] = float(free_cash_flow)
 
         return free_cash_flows
+
+    def _percentage_change(old, new):
+        return float((new - old) / old)
