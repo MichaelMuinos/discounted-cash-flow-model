@@ -1,4 +1,9 @@
 class Constants:
+    class FINANCIALS:
+        INCOME_STATEMENT = "income_statement"
+        BALANCE_SHEET = "balance_sheet"
+        CASH_FLOW_STATEMENT = "cash_flow_statement"
+
     class CASH_FLOW_STATEMENT:
         DATE = "date"
         DEPRECIATION_AND_AMORTIZATION = "Depreciation & Amortization"
