@@ -28,7 +28,7 @@ class FinancialModelingPrep:
                 "cash_flow_statement: {...}
             }
         """
-        def has_more_than_minimum(minimum_years, data):
+        def _has_more_than_minimum(minimum_years, data):
             """
             Determines if we have enough data to perform DCF calculation.
 
@@ -60,21 +60,21 @@ class FinancialModelingPrep:
         income_statement_response, income_err = self._get_income_statement(symbol)
         if income_err:
             raise Exception(f"Failed to fetch income statement for ticker symbol {symbol}.")
-        if not has_more_than_minimum(minimum_years, income_statement_response):
+        if not _has_more_than_minimum(minimum_years, income_statement_response):
             raise Exception(f"Not enough data found in the income statement for ticker symbol {symbol}.")
         financials["income_statement"] = income_statement_response
 
         balance_sheet_response, balance_err = self._get_balance_sheet(symbol)
         if balance_err:
             raise Exception(f"Failed to fetch balance sheet for ticker symbol {symbol}")
-        if not has_more_than_minimum(minimum_years, balance_sheet_response):
+        if not _has_more_than_minimum(minimum_years, balance_sheet_response):
             raise Exception(f"Not enough data found in the balance sheet for ticker symbol {symbol}.")
         financials["balance_sheet"] = balance_sheet_response
 
         cash_flow_statement_response, cash_flow_err = self._get_cash_flow_statement(symbol)
         if cash_flow_err:
             raise Exception(f"Failed to fetch cash flow statement for ticker symbol {symbol}")
-        if not has_more_than_minimum(minimum_years, cash_flow_statement_response):
+        if not _has_more_than_minimum(minimum_years, cash_flow_statement_response):
             raise Exception(f"Not enough data found in the cash flow statement for ticker symbol {symbol}.")
         financials["cash_flow_statement"] = cash_flow_statement_response
 

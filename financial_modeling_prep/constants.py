@@ -4,7 +4,7 @@ class Constants:
         BALANCE_SHEET = "balance_sheet"
         CASH_FLOW_STATEMENT = "cash_flow_statement"
 
-    class BALANCE_SHEET:
+    class INCOME_STATEMENT:
         DATE = "date"
         REVENUE = "Revenue"
         REVENUE_GROWTH = "Revenue Growth"

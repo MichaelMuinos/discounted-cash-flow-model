@@ -22,17 +22,17 @@ if __name__ == "__main__":
     parser.add_argument('--return_percentage', action=NumberAction, help='Specify the required rate of return in terms of a percentage.', type=int, default=8)
     parser.add_argument('--minimum_years', action=NumberAction, help='Specify the minimum amount of years of data points needed to perform the DCF calculation.', type=int, default=4)
     parser.add_argument('--years_to_project', action=NumberAction, help='Specify the number of years to project future earnings.', type=int, default=4)
-    parser.add_argument('--growth_rate_estimate', action=GrowthRateEstimateAction, help='Specify the type of estimation you would like to do. Choose between `conservative` (minimum percentage change), `moderate` (average percentage change), or `bullish` (max percentage change).', default='moderate')
+    parser.add_argument('--risk', action=GrowthRateEstimateAction, help='Specify the level of rick you would like to take. Choose between `conservative` (minimum percentage change), `moderate` (average percentage change), or `bullish` (max percentage change).', default='moderate')
     args = parser.parse_args()
 
     print(f"Ticker symbols -> {'\t'.join(args.ticks)}")
     print(f"Required rate of return -> {args.return_percentage} %")
     print(f"Minimum amount of years of data -> {args.minimum_years} {'year' if args.minimum_years == 1 else 'years'}")
     print(f"Number of years to project future earnings -> {args.years_to_project} {'year' if args.years_to_project == 1 else 'years'}")
-    print(f"Growth rate estimation -> {args.growth_rate_estimate}")
+    print(f"Risk -> {args.risk}")
 
     api = FinancialModelingPrep()
-    model = DiscountedCashFlowModel(args.return_percentage, args.years_to_project, args.growth_rate_estimate)
+    model = DiscountedCashFlowModel(args.return_percentage, args.years_to_project, args.risk)
 
     for tick in args.ticks:
         print(f"Analyzing ticker symbol {tick}")

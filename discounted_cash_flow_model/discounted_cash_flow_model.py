@@ -1,84 +1,176 @@
 from financial_modeling_prep.constants import Constants
-from growth_rate_estimate import GrowthRateEstimate
+from risk import Risk
 
 class DiscountedCashFlowModel:
-    def __init__(self, return_percentage, years_to_project, growth_rate_estimate):
+    def __init__(self, return_percentage, years_to_project, risk):
         self.return_percentage = return_percentage
         self.years_to_project = years_to_project
-        self.growth_rate_estimate = growth_rate_estimate
+        self.risk = risk
 
     def calculate(self, symbol, financials):
-        # step 1 : calculate free cash flow for however many years of data we have
-        free_cash_flow = self._calculate_free_cash_flow(symbol, financials)
+        # step 1 : combine revenue, net income, and free cash flow
+        metrics = self._combine_metrics(financials)
 
         # step 2 : calculate percentage from FCF to Net Income
-        fcf_to_net_income_percentage = self._calculate_fcf_to_net_income_percentage(free_cash_flow, financials)
+        free_cash_flow_rate_percentage = self._calculate_free_cash_flow_rate(fcf_and_net_income)
 
-        # step 2 : determine future revenue estimates
+        # step 3 : calculate the revenue growth rate estimate
+        revenue_growth_rate = self._calculate_revenue_growth_rate(metrics)
+
+        # step 4 : apply revenue growth rate to add future revenue estimates to our metrics
+        metrics = self._calculate_future_revenue(metrics, revenue_growth_rate)
+
+        # step 4 : calculate net income margins percentage
+
+        # step 5 : calculate future net income estimates
+
+        # step 6 : calculate future free cash flow estimates
+
         free_cash_flow_with_projected_revenue = self._calculate_projected_revenue(free_cash_flow)
 
-        # step 3 : determine future net income estimates
-         
-
-    def _calculate_free_cash_flow(self, symbol, financials):
+    def _combine_metrics(financials):
         """
-        FCF (simple) -> cash flow from operations - capex
+        Combines the revenue, net income, and free cash flow using the income
+        and cash flow statement.
 
         Parameters
         ----------
-        symbol : str
-            ticker symbol
-        
+        financials : dict
+            api data coming directly from `financial_modeling_prep.py`
+
+            structure of dict:
+            {
+                "income_statement": {...},
+                "balance_sheet": {...},
+                "cash_flow_statement": {...}
+            }
+
         Returns
         -------
-        array of tuples
-            FCF for as many years of data the API 
-            gives us in ascensing order by year.
+        array<dict>
+            An aggregation of revenue, net income, and free cash flow for all available data.
+            Array is sorted in ascending order by year
 
-            Structure of array:
-                [
-                    (2019, 200000),
-                    (2018, 100000),
-                    ...
-                ]
-        """            
+            structure of array:
+            [
+                {
+                    "year": 2019,
+                    "revenue": 2000,
+                    "net_income": 1000,
+                    "free_cash_flow": 1500
+                },
+                ...
+            ]
+        """
+        def _calculate_free_cash_flow(cash_flow_year):
+            """
+            Calculates free cash flow using the cash flow statement.
+            FCF = Cash Flow from Operations - Capex
+
+            Parameters
+            ----------
+            cash_flow_year : dict
+                cash flow metrics from the financials
+
+            Returns
+            -------
+            float
+                free cash flow calculation
+            """
+            return float(cash_flow_year[Constants.CASH_FLOW_STATEMENT.OPERATING_CASH_FLOW]) - float(cash_flow_year[Constants.CASH_FLOW_STATEMENT.CAPITAL_EXPENDITURE])
+
+        income_statement = financials[Constants.FINANCIALS.INCOME_STATEMENT]
         cash_flow_statement = financials[Constants.FINANCIALS.CASH_FLOW_STATEMENT]
 
-        free_cash_flows = []
-        for year_financial in cash_flow_statement["financials"]:
-            date = year_financial[Constants.CASH_FLOW_STATEMENT.DATE]
-            year = date.split("-")[0]
-            free_cash_flow = year_financial[Constants.CASH_FLOW_STATEMENT.OPERATING_CASH_FLOW] - year_financial[Constants.CASH_FLOW_STATEMENT.CAPITAL_EXPENDITURE]
-            free_cash_flows.append(int(year), float(free_cash_flow))
+        metrics = []
+        for income_year, cash_flow_year in zip(income_statement["financials"], cash_flow_statement["financials"]):
+            date = income_year[Constants.INCOME_STATEMENT.DATE]
+            year = int(date.split("-")[0])
+
+            revenue = float(income_statement[Constants.INCOME_STATEMENT.REVENUE])
+            net_income = float(income_statement[Constants.INCOME_STATEMENT.NET_INCOME])
+            free_cash_flow = _calculate_free_cash_flow(cash_flow_year)
+
+            metrics.append({"year" : year, "revenue" : revenue, "net_income" : net_income, "free_cash_flow" : free_cash_flow })
 
         # ensure it is sorted in ascending order by year
-        return sorted(free_cash_flows, key=lambda tup: tup[0])
+        return sorted(metrics, lambda x : x["year"])
 
-    def _calculate_fcf_to_net_income_percentage(self, free_cash_flow, financials)
-        
+    def _calculate_free_cash_flow_rate(self, metrics):
+        """
+        Calculates the free cash flow rate based on historical FCF and net income.
+        FCFR = FCF / Net Income
 
+        Parameters
+        ----------
+        metrics : array<dict>
+            An aggregation of revenue, net income, and free cash flow for all available data.
+            Array is sorted in ascending order by year
 
-    def _calculate_projected_revenue(self, free_cash_flow):
+            structure of array:
+            [
+                {
+                    "year": 2019,
+                    "revenue": 2000,
+                    "net_income": 1000,
+                    "free_cash_flow": 1500
+                },
+                ...
+            ]
+
+        Returns
+        -------
+        float
+            free cash flow rate to be used
+        """
+        ratios = [float(metric["free_cash_flow"] / metric["net_income"]) for metric in metrics]
+
+        # choose ratio to use based on risk arg
+        return self._choose_percentage_based_on_risk(ratios)
+
+    def _calculate_revenue_growth_rate(self, metrics):
+        """
+        Calculates the revenue growth rate to project future earnings. It is 
+        calculated based on `self.risk`.
+
+        Parameters
+        ----------
+        metrics : array<dict>
+            An aggregation of revenue, net income, and free cash flow for all available data.
+            Array is sorted in ascending order by year
+
+            structure of array:
+            [
+                {
+                    "year": 2019,
+                    "revenue": 2000,
+                    "net_income": 1000,
+                    "free_cash_flow": 1500
+                },
+                ...
+            ]
+
+        Returns
+        -------
+        float
+            Revenue growth rate percentage
+        """
+        percentage_changes = []
+        for i in range(1, len(metrics)):
+            curr_cash = metrics[i]["revenue"]
+            prev_cash = metrics[i - 1]["revenue"]
+            change = self._percentage_change(prev_cash, curr_cash)
+            percentage_changes.append(change)
+
+        # get our growth rate depending on our risk arg
+        return self._choose_percentage_based_on_risk(percentage_changes)
+
+    def _calculate_future_revenue(self, metrics, revenue_growth_rate):
+ 
+    def _calculate_projected_revenue(self, metrics):
         """
         TODO
         """
-        def _get_revenue_growth_rate_percentage(growth_rate_estimate, percentage_changes):
-            """
-            Based on the growth rate arg, determine the appropriate growth
-            rate to use for future revenue projections
-
-            TODO
-            """
-            if growth_rate_estimate == GrowthRateEstimate.CONSERVATIVE:
-                # grab the minimum percentage change
-                return min(percentage_changes)
-            elif growth_rate_estimate == GrowthRateEstimate.MODERATE:
-                # calculate the average of the percentages
-                return sum(percentage_changes) / len(percentage_changes)
-            else:
-                # bullish estimate requires the maximum percentage change
-                return max(percentage_changes)
-
         # calculate all of the percentage changes
         percentage_changes = []
         for i in range(1, len(free_cash_flow)):
@@ -98,8 +190,19 @@ class DiscountedCashFlowModel:
 
         return free_cash_flow
 
-    def _apply_percentage(num, percentage):
+    def _choose_percentage_based_on_risk(percentages):
+        if self.risk == Risk.CONSERVATIVE:
+            # grab the minimum percentage change
+            return min(percentages)
+        elif self.risk == Risk.MODERATE:
+            # calculate the average of the percentages
+            return sum(percentages) / len(percentages)
+        else:
+            # bullish estimate requires the maximum percentage change
+            return max(percentages)
+
+    def _apply_percentage(self, num, percentage):
         return float(num * percentage + num)
 
-    def _percentage_change(old, new):
+    def _percentage_change(self, old, new):
         return float((new - old) / old)
