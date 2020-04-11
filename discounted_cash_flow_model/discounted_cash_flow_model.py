@@ -12,13 +12,16 @@ class DiscountedCashFlowModel:
         metrics = self._combine_metrics(financials)
 
         # step 2 : calculate percentage from FCF to Net Income
-        free_cash_flow_rate_percentage = self._calculate_free_cash_flow_rate(fcf_and_net_income)
+        free_cash_flow_rate_percentage = self._calculate_free_cash_flow_rate(metrics)
 
         # step 3 : calculate the revenue growth rate estimate
         revenue_growth_rate = self._calculate_revenue_growth_rate(metrics)
 
-        # step 4 : apply revenue growth rate to add future revenue estimates to our metrics
-        metrics = self._calculate_future_revenue(metrics, revenue_growth_rate)
+        # step 4 : calculate net income margins percentage
+        net_income_margins_percentage = self._calculate_net_income_margins_percentage(metrics)
+
+        # step 5 : apply calculated percentages from step 2, 3, and 4 to estimate future revenue, net income, and free cash flow
+        metrics = self._estimate_future_metrics(metrics, free_cash_flow_rate_percentage, revenue_growth_rate, net_income_margins_percentage)
 
         # step 4 : calculate net income margins percentage
 
@@ -153,7 +156,7 @@ class DiscountedCashFlowModel:
         Returns
         -------
         float
-            Revenue growth rate percentage
+            revenue growth rate percentage
         """
         percentage_changes = []
         for i in range(1, len(metrics)):
@@ -165,30 +168,200 @@ class DiscountedCashFlowModel:
         # get our growth rate depending on our risk arg
         return self._choose_percentage_based_on_risk(percentage_changes)
 
-    def _calculate_future_revenue(self, metrics, revenue_growth_rate):
- 
-    def _calculate_projected_revenue(self, metrics):
+    def _calculate_net_income_margins_percentage(self, metrics):
         """
-        TODO
+        Calculates the net income margins in order to estimate future net income.
+        Net Income Margins = Net Income / Revenue
+
+        Parameters
+        ----------
+        metrics : array<dict>
+            An aggregation of revenue, net income, and free cash flow for all available data.
+            Array is sorted in ascending order by year
+
+            structure of array:
+            [
+                {
+                    "year": 2019,
+                    "revenue": 2000,
+                    "net_income": 1000,
+                    "free_cash_flow": 1500
+                },
+                ...
+            ]
+
+        Returns
+        -------
+        float
+            Net Income Margin percentage chosen based on risk
         """
-        # calculate all of the percentage changes
-        percentage_changes = []
-        for i in range(1, len(free_cash_flow)):
-            curr_cash = free_cash_flow[i]
-            prev_cash = free_cash_flow[i - 1]
-            change = self._percentage_change(prev_cash, curr_cash)
-            percentage_changes.append(change)
+        net_income_margin_percentages = [float(metric["net_income"] / metric["revenue"]) for metric in metrics]
 
-        # get our growth rate depending on `self.growth_rate_estimate`
-        growth_rate_percentage = _get_revenue_growth_rate_percentage(self.growth_rate_estimate, percentage_changes)
+        # choose ratio to use based on risk arg
+        return self._choose_percentage_based_on_risk(net_income_margin_percentages)
 
-        # now that we have our growth rate, project the future years of revenue
-        year, cash_flow = free_cash_flow[-1]
-        for future_year in range(year + 1, year + self.years_to_project + 1):
-            cash_flow = self._apply_percentage(cash_flow, growth_rate_percentage)
-            free_cash_flow.append((future_year, cash_flow))
+    def _estimate_future_metrics(self, metrics, free_cash_flow_rate_percentage, revenue_growth_rate, net_income_margins_percentage):
+        """
+        Estimate future revenues, net income, and free cash flow.
 
-        return free_cash_flow
+        Parameters
+        ----------
+        metrics : array<dict>
+            An aggregation of revenue, net income, and free cash flow for all available data.
+            Array is sorted in ascending order by year
+
+            structure of array:
+            [
+                {
+                    "year": 2019,
+                    "revenue": 2000,
+                    "net_income": 1000,
+                    "free_cash_flow": 1500
+                },
+                ...
+            ]
+
+        free_cash_flow_rate_percentage : float
+            rate used to estimate future free cash flow
+
+        revenue_growth_rate : float
+            rate used to estimate future revenue
+
+        net_income_margins_percentage : float
+            rate used to estimate future net income
+
+        Returns
+        -------
+        array<dict>
+            An aggregation of FUTURE revenue, net income, and free cash flow.
+
+            structure of array:
+            [
+                {
+                    "year": 2019,
+                    "revenue": 2000,
+                    "net_income": 1000,
+                    "free_cash_flow": 1500
+                },
+                ...
+            ]
+        """
+        def _calculate_future_revenue(metrics, revenue_growth_rate, years_to_project, apply_percentage):
+            """
+            Calculate the future revenue using the appropriate 
+            growth rate for `years_to_project` in the future.
+
+            Parameters
+            ----------
+            metrics : array<dict>
+                An aggregation of revenue, net income, and free cash flow for all available data.
+                Array is sorted in ascending order by year
+
+                structure of array:
+                [
+                    {
+                        "year": 2019,
+                        "revenue": 2000,
+                        "net_income": 1000,
+                        "free_cash_flow": 1500
+                    },
+                    ...
+                ]
+
+            revenue_growth_rate : float
+                rate used to estimate future revenue
+
+            years_to_project : int
+                number of years in the future to project to
+
+            apply_percentage : func
+                function will apply a percentage to the passed in number
+
+            Returns
+            -------
+            array<dict>
+                Future projected revenues
+
+                structure of array:
+                [
+                    {
+                        "year": 2019,
+                        "revenue": 2000
+                    },
+                    ...
+                ]
+            """
+            future_revenue = []
+
+            metric = metrics[-1]
+            year = metric["year"]
+            curr_revenue = metric["revenue"]
+            for future_year in range(year + 1, year + years_to_project + 1):
+                curr_revenue = apply_percentage(curr_revenue, revenue_growth_rate)
+                future_revenue.append({"year": future_revenue, "revenue": curr_revenue})
+
+            return future_revenue
+
+        def _calculate_future_net_income_and_free_cash_flow(future_revenue, free_cash_flow_rate_percentage, net_income_margins_percentage):
+            """
+            Calculates the future net income and free cash flow based off of future revenue.
+
+            Parameters
+            ----------
+            future_revenue : array<dict>
+                Future projected revenues
+
+                structure of array:
+                [
+                    {
+                        "year": 2019,
+                        "revenue": 2000
+                    },
+                    ...
+                ]
+
+            free_cash_flow_rate_percentage : float
+                rate used to estimate future free cash flow
+
+            net_income_margins_percentage : float
+                rate used to estimate future net income
+
+            Returns
+            -------
+            array<dict>
+                future metrics for revenue, net income, and free cash flow
+
+                structure of array:
+                [
+                    {
+                        "year": 2019,
+                        "revenue": 2000,
+                        "net_income": 1000,
+                        "free_cash_flow": 1500
+                    },
+                    ...
+                ]
+            """
+            future_metrics = []
+            for i, estimate in enumerate(future_revenue):
+                future_year = estimate["year"]
+                future_revenue = estimate["revenue"]
+
+                future_net_income = future_revenue * net_income_margins_percentage
+                future_free_cash_flow = future_net_income * free_cash_flow_rate_percentage
+
+                estimate["net_income"] = future_net_income
+                estimate["free_cash_flow"] = future_free_cash_flow
+
+                future_metrics.append(estimate)
+
+            return future_metrics
+
+        # get future revenues
+        future_revenue = _calculate_future_revenue(matrix, revenue_growth_rate, self.years_to_project, self._apply_percentage)
+
+        # from future revenues, calculate future net income / free cash flow
+        return _calculate_future_net_income_and_free_cash_flow(future_revenue, free_cash_flow_rate_percentage, net_income_margins_percentage)
 
     def _choose_percentage_based_on_risk(percentages):
         if self.risk == Risk.CONSERVATIVE:
