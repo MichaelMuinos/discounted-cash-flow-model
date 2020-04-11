@@ -21,15 +21,7 @@ class DiscountedCashFlowModel:
         net_income_margins_percentage = self._calculate_net_income_margins_percentage(metrics)
 
         # step 5 : apply calculated percentages from step 2, 3, and 4 to estimate future revenue, net income, and free cash flow
-        metrics = self._estimate_future_metrics(metrics, free_cash_flow_rate_percentage, revenue_growth_rate, net_income_margins_percentage)
-
-        # step 4 : calculate net income margins percentage
-
-        # step 5 : calculate future net income estimates
-
-        # step 6 : calculate future free cash flow estimates
-
-        free_cash_flow_with_projected_revenue = self._calculate_projected_revenue(free_cash_flow)
+        future_metrics = self._estimate_future_metrics(metrics, free_cash_flow_rate_percentage, revenue_growth_rate, net_income_margins_percentage)
 
     def _combine_metrics(financials):
         """
