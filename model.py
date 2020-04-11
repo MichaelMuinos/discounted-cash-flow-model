@@ -38,7 +38,7 @@ if __name__ == "__main__":
         print(f"Analyzing ticker symbol {tick}")
 
         print("Fetching financial statements...")
-        financials = api.get_financials(symbol, args.minimum_years)
+        financials = api.get_financials(tick, args.minimum_years)
 
         print("Calculating DCF...")
         data = model.calculate(tick, financials)

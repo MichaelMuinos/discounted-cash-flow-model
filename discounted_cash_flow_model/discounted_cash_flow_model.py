@@ -9,12 +9,18 @@ class DiscountedCashFlowModel:
 
     def calculate(self, symbol, financials):
         # step 1 : calculate free cash flow for however many years of data we have
-        free_cash_flow = self._calculate_free_cash_flow(symbol)
+        free_cash_flow = self._calculate_free_cash_flow(symbol, financials)
+
+        # step 2 : calculate percentage from FCF to Net Income
+        fcf_to_net_income_percentage = self._calculate_fcf_to_net_income_percentage(free_cash_flow, financials)
 
         # step 2 : determine future revenue estimates
         free_cash_flow_with_projected_revenue = self._calculate_projected_revenue(free_cash_flow)
 
-    def _calculate_free_cash_flow(self, symbol):
+        # step 3 : determine future net income estimates
+         
+
+    def _calculate_free_cash_flow(self, symbol, financials):
         """
         FCF (simple) -> cash flow from operations - capex
 
@@ -36,7 +42,7 @@ class DiscountedCashFlowModel:
                     ...
                 ]
         """            
-        cash_flow_statement = self.financials[Constants.FINANCIALS.CASH_FLOW_STATEMENT]
+        cash_flow_statement = financials[Constants.FINANCIALS.CASH_FLOW_STATEMENT]
 
         free_cash_flows = []
         for year_financial in cash_flow_statement["financials"]:
@@ -47,6 +53,10 @@ class DiscountedCashFlowModel:
 
         # ensure it is sorted in ascending order by year
         return sorted(free_cash_flows, key=lambda tup: tup[0])
+
+    def _calculate_fcf_to_net_income_percentage(self, free_cash_flow, financials)
+        
+
 
     def _calculate_projected_revenue(self, free_cash_flow):
         """
