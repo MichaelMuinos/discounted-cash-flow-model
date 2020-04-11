@@ -19,7 +19,7 @@ class GrowthRateEstimateAction(argparse.Action):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Use the DCF model for various companies.')
     parser.add_argument('--ticks', nargs='+', help='Specify ticker symbols (1 or more).', required=True)
-    parser.add_argument('--return_percentage', action=NumberAction, help='Specify the required rate of return in terms of a percentage.', type=int, default=8)
+    parser.add_argument('--return_percentage', action=NumberAction, help='Specify the required rate of return in terms of a percentage.', type=float, default=8.0)
     parser.add_argument('--minimum_years', action=NumberAction, help='Specify the minimum amount of years of data points needed to perform the DCF calculation.', type=int, default=4)
     parser.add_argument('--years_to_project', action=NumberAction, help='Specify the number of years to project future earnings.', type=int, default=4)
     parser.add_argument('--risk', action=GrowthRateEstimateAction, help='Specify the level of rick you would like to take. Choose between `conservative` (minimum percentage change), `moderate` (average percentage change), or `bullish` (max percentage change).', default='moderate')
