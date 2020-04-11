@@ -1,4 +1,28 @@
 class Constants:
+    class QUOTES:
+        SYMBOL = "symbol"
+        NAME = "name"
+        PRICE = "price"
+        CHANGES_PERCENTAGE = "changesPercentage"
+        CHANGE = "change"
+        DAY_LOW = "dayLow"
+        DAY_HIGH = "dayHigh"
+        YEAR_HIGH = "yearHigh"
+        YEAR_LOW = "yearLow"
+        MARKET_CAP = "marketCap"
+        PRICE_AVG_50 = "priceAvg50"
+        PRICE_AVG_200 = "priceAvg200"
+        VOLUME = "volume"
+        AVG_VOLUME = "avgVolume"
+        EXCHANGE = "exhange"    # yes, they spelled it wrong
+        OPEN = "open"
+        PREVIOUS_CLOSE = "previousClose"
+        EPS = "eps"
+        PE = "pe"
+        EARNINGS_ANNOUNCEMENT = "earningsAnnouncement"  # "2020-05-01T00:00:00.000+0000"
+        SHARES_OUTSTANDING = "sharesOutstanding"
+        TIMESTAMP = "timestamp"
+
     class FINANCIALS:
         INCOME_STATEMENT = "income_statement"
         BALANCE_SHEET = "balance_sheet"

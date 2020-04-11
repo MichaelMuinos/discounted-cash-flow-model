@@ -7,7 +7,7 @@ class DiscountedCashFlowModel:
         self.years_to_project = years_to_project
         self.risk = risk
 
-    def calculate(self, symbol, financials):
+    def calculate(self, symbol, financials, quotes):
         # step 1 : combine revenue, net income, and free cash flow
         metrics = self._combine_metrics(financials)
 
