@@ -1,8 +1,10 @@
 import requests
+import json
 
 class FinancialModelingPrep:
-    def __init__(self):
+    def __init__(self, logger):
         self.base_url = "https://financialmodelingprep.com"
+        self.logger = logger
 
     def get_quotes(self, symbol):
         """
@@ -21,11 +23,17 @@ class FinancialModelingPrep:
 
             structure of dict can be found in `financial_modeling_api.constants.Constants.QUOTES`
         """
+        self.logger.debug("--- FinancialModelingPrep.get_quotes ---")
+
         url = f"{self._version()}quote/{symbol.upper()}"
+
+        self.logger.debug(f"url -> {url}")
 
         quote_response, err = self._call_api(url)
         if err:
             raise Exception(f"Failed to fetch quote data for ticker symbol {symbol}.")
+
+        self.logger.debug(f"quote_response -> {json.dumps(quote_response, indent=2)}\n")
 
         return quote_response
 
@@ -80,6 +88,8 @@ class FinancialModelingPrep:
             """
             return len(data["financials"]) >= minimum_years
 
+        self.logger.debug("--- FinancialModelingPrep.get_financials ---")
+
         financials = {}
 
         income_statement_response, income_err = self._get_income_statement(symbol)
@@ -88,6 +98,8 @@ class FinancialModelingPrep:
         if not _has_more_than_minimum(minimum_years, income_statement_response):
             raise Exception(f"Not enough data found in the income statement for ticker symbol {symbol}.")
         financials["income_statement"] = income_statement_response
+        
+        self.logger.debug(f"income_statement_response -> {json.dumps(income_statement_response, indent=2)}\n")
 
         balance_sheet_response, balance_err = self._get_balance_sheet(symbol)
         if balance_err:
@@ -96,12 +108,16 @@ class FinancialModelingPrep:
             raise Exception(f"Not enough data found in the balance sheet for ticker symbol {symbol}.")
         financials["balance_sheet"] = balance_sheet_response
 
+        self.logger.debug(f"balance_sheet_response -> {json.dumps(balance_sheet_response, indent=2)}\n")
+
         cash_flow_statement_response, cash_flow_err = self._get_cash_flow_statement(symbol)
         if cash_flow_err:
             raise Exception(f"Failed to fetch cash flow statement for ticker symbol {symbol}")
         if not _has_more_than_minimum(minimum_years, cash_flow_statement_response):
             raise Exception(f"Not enough data found in the cash flow statement for ticker symbol {symbol}.")
         financials["cash_flow_statement"] = cash_flow_statement_response
+
+        self.logger.debug(f"cash_flow_statement_response -> {json.dumps(cash_flow_statement_response, indent=2)}\n")
 
         return financials
 
@@ -163,7 +179,11 @@ class FinancialModelingPrep:
             dict represents the json response coming from the api call. if there is an error, this will be None.
             Exception is an error object where if the api call is successful, this will be none
         """
+        self.logger.debug("--- FinancialModelingPrep._get_income_statement ---")
+
         url = f"{self._financials()}income-statement/{symbol.upper()}"
+        self.logger.debug(f"url -> {url}")
+
         return self._call_api(url)
 
     def _get_balance_sheet(self, symbol):
@@ -181,7 +201,11 @@ class FinancialModelingPrep:
             dict represents the json response coming from the api call. if there is an error, this will be None.
             Exception is an error object where if the api call is successful, this will be none
         """
+        self.logger.debug("--- FinancialModelingPrep._get_balance_sheet ---")
+
         url = f"{self._financials()}balance-sheet-statement/{symbol.upper()}"
+        self.logger.debug(f"url -> {url}")
+
         return self._call_api(url)
 
     def _get_cash_flow_statement(self, symbol):
@@ -199,6 +223,10 @@ class FinancialModelingPrep:
             dict represents the json response coming from the api call. if there is an error, this will be None.
             Exception is an error object where if the api call is successful, this will be none
         """
+        self.logger.debug("--- FinancialModelingPrep._get_cash_flow_statement ---")
+
         url = f"{self._financials()}cash-flow-statement/{symbol.upper()}"
+        self.logger.debug(f"url -> {url}")
+
         return self._call_api(url)
 

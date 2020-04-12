@@ -1,13 +1,15 @@
 from financial_modeling_prep.constants import Constants
 from .risk import Risk
+import json
 
 class DiscountedCashFlowModel:
-    def __init__(self, required_rate_of_return, years_to_project, risk, perpetual_growth_rate, margin_of_safety):
+    def __init__(self, required_rate_of_return, years_to_project, risk, perpetual_growth_rate, margin_of_safety, logger):
         self.required_rate_of_return = required_rate_of_return
         self.years_to_project = years_to_project
         self.risk = risk
         self.perpetual_growth_rate = perpetual_growth_rate
         self.margin_of_safety = margin_of_safety
+        self.logger = logger
 
     def calculate(self, symbol, financials, quotes):
         """
@@ -41,6 +43,8 @@ class DiscountedCashFlowModel:
             first return is the fair value
             second return is the fair value with a margin of safety applied to it
         """
+        self.logger.debug("--- DiscountedCashFlowModel.calculate ---\n")
+
         # step 1 : combine revenue, net income, and free cash flow
         metrics = self._combine_metrics(financials)
 
@@ -120,6 +124,8 @@ class DiscountedCashFlowModel:
                 free cash flow calculation
             """
             return float(cash_flow_year[Constants.CASH_FLOW_STATEMENT.OPERATING_CASH_FLOW]) - float(cash_flow_year[Constants.CASH_FLOW_STATEMENT.CAPITAL_EXPENDITURE])
+                
+        self.logger.debug("--- Step # 1 -> DiscountedCashFlowModel._combine_metrics ---")
 
         income_statement = financials[Constants.FINANCIALS.INCOME_STATEMENT]
         cash_flow_statement = financials[Constants.FINANCIALS.CASH_FLOW_STATEMENT]
@@ -136,7 +142,10 @@ class DiscountedCashFlowModel:
             metrics.append({"year" : year, "revenue" : revenue, "net_income" : net_income, "free_cash_flow" : free_cash_flow })
 
         # ensure it is sorted in ascending order by year
-        return sorted(metrics, key=lambda x : x["year"])
+        metrics = sorted(metrics, key=lambda x : x["year"])
+        self.logger.debug(f"metrics -> {json.dumps(metrics, indent=2)}\n")
+
+        return metrics
 
     def _calculate_free_cash_flow_rate(self, metrics):
         """
@@ -165,10 +174,15 @@ class DiscountedCashFlowModel:
         float
             free cash flow rate to be used
         """
+        self.logger.debug("--- Step # 2 -> DiscountedCashFlowModel._calculate_free_cash_flow_rate ---")
+
         ratios = [float(metric["free_cash_flow"] / metric["net_income"]) for metric in metrics]
 
         # choose ratio to use based on risk arg
-        return self._choose_percentage_based_on_risk(ratios)
+        percentage = self._choose_percentage_based_on_risk(ratios)
+        self.logger.debug(f"percentage -> {percentage}\n")
+
+        return percentage
 
     def _calculate_revenue_growth_rate(self, metrics):
         """
@@ -197,6 +211,8 @@ class DiscountedCashFlowModel:
         float
             revenue growth rate percentage
         """
+        self.logger.debug("--- Step # 3 -> DiscountedCashFlowModel._calculate_revenue_growth_rate ---")
+
         percentage_changes = []
         for i in range(1, len(metrics)):
             curr_cash = metrics[i]["revenue"]
@@ -205,7 +221,10 @@ class DiscountedCashFlowModel:
             percentage_changes.append(change)
 
         # get our growth rate depending on our risk arg
-        return self._choose_percentage_based_on_risk(percentage_changes)
+        percentage = self._choose_percentage_based_on_risk(percentage_changes)
+        self.logger.debug(f"percentage -> {percentage}\n")
+
+        return percentage
 
     def _calculate_net_income_margins_percentage(self, metrics):
         """
@@ -234,10 +253,15 @@ class DiscountedCashFlowModel:
         float
             Net Income Margin percentage chosen based on risk
         """
+        self.logger.debug("--- Step # 4 -> DiscountedCashFlowModel._calculate_net_income_margins_percentage ---")
+
         net_income_margin_percentages = [float(metric["net_income"] / metric["revenue"]) for metric in metrics]
 
         # choose ratio to use based on risk arg
-        return self._choose_percentage_based_on_risk(net_income_margin_percentages)
+        percentage = self._choose_percentage_based_on_risk(net_income_margin_percentages)
+        self.logger.debug(f"percentage -> {percentage}\n")
+
+        return percentage
 
     def _estimate_future_metrics(self, metrics, free_cash_flow_rate_percentage, revenue_growth_rate, net_income_margins_percentage):
         """
@@ -337,7 +361,7 @@ class DiscountedCashFlowModel:
             curr_revenue = metric["revenue"]
             for future_year in range(year + 1, year + years_to_project + 1):
                 curr_revenue = apply_percentage(curr_revenue, revenue_growth_rate)
-                future_revenue.append({"year": future_revenue, "revenue": curr_revenue})
+                future_revenue.append({"year": future_year, "revenue": curr_revenue})
 
             return future_revenue
 
@@ -396,11 +420,17 @@ class DiscountedCashFlowModel:
 
             return future_metrics
 
+        self.logger.debug("--- Step # 5 -> DiscountedCashFlowModel._estimate_future_metrics ---")
+
         # get future revenues
         future_revenue = _calculate_future_revenue(metrics, revenue_growth_rate, self.years_to_project, self._add_percentage)
+        self.logger.debug(f"future_revenue -> {json.dumps(future_revenue, indent=2)}\n")
 
         # from future revenues, calculate future net income / free cash flow
-        return _calculate_future_net_income_and_free_cash_flow(future_revenue, free_cash_flow_rate_percentage, net_income_margins_percentage)
+        future_metrics = _calculate_future_net_income_and_free_cash_flow(future_revenue, free_cash_flow_rate_percentage, net_income_margins_percentage)
+        self.logger.debug(f"future_metrics -> {json.dumps(future_metrics, indent=2)}\n")
+
+        return future_metrics
 
     def _calculate_terminal_value(self, last_future_metric):
         """
@@ -430,11 +460,16 @@ class DiscountedCashFlowModel:
         float
             the terminal value based off of the last free cash flow
         """
+        self.logger.debug("--- Step # 6 -> DiscountedCashFlowModel._calculate_terminal_value ---")
+
         fcf = last_future_metric["free_cash_flow"]
         g = float(self.perpetual_growth_rate / 100)
         r = float(self.required_rate_of_return / 100)
 
-        return (fcf * (1 + g)) / (r - g)
+        terminal_value = (fcf * (1 + g)) / (r - g)
+        self.logger.debug(f"terminal_value -> {terminal_value}\n")
+
+        return terminal_value
             
     def _calculate_today_value(self, future_metrics, terminal_value):
         """
@@ -508,6 +543,8 @@ class DiscountedCashFlowModel:
                 return (1 + r) ** t
             return fcf / _discount_factor(r, t)
 
+        self.logger.debug("--- Step # 7 -> DiscountedCashFlowModel._calculate_today_value ---")
+
         r = float(self.required_rate_of_return / 100)
 
         # must sum our future estimates AND terminal value discounted
@@ -515,7 +552,10 @@ class DiscountedCashFlowModel:
         present_value_terminal = _present_value(terminal_value, r, len(future_metrics))
 
         # return today's value
-        return present_values_future_fcf + present_value_terminal
+        today_value = present_values_future_fcf + present_value_terminal
+        self.logger.debug(f"today_value -> {today_value}\n")
+
+        return today_value
 
     def _calculate_fair_value(self, quotes, today_value):
         """
@@ -535,8 +575,14 @@ class DiscountedCashFlowModel:
         float
             fair value for the company
         """
+        self.logger.debug("--- Step # 8 -> DiscountedCashFlowModel._calculate_fair_value ---")
+
         shares_outstanding = quotes[0][Constants.QUOTES.SHARES_OUTSTANDING]
-        return float(today_value / shares_outstanding)
+        fair_value = today_value / shares_outstanding
+
+        self.logger.debug(f"fair_value -> {fair_value}\n")
+
+        return fair_value
 
     def _apply_margin_of_safety(self, fair_value):
         """
@@ -552,8 +598,13 @@ class DiscountedCashFlowModel:
         float
             fair value accounted by the margin of safety
         """
+        self.logger.debug("--- Step # 9 -> DiscountedCashFlowModel._apply_margin_of_safety ---")
+
         margin_of_safety = float(self.margin_of_safety / 100)
-        return self._subtract_percentage(fair_value, margin_of_safety)
+        fair_value_with_margin_of_safety = self._subtract_percentage(fair_value, margin_of_safety)
+        self.logger.debug(f"fair_value_with_margin_of_safety -> {fair_value_with_margin_of_safety}\n")
+
+        return fair_value_with_margin_of_safety
 
     def _choose_percentage_based_on_risk(self, percentages):
         """
