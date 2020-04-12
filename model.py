@@ -44,7 +44,13 @@ if __name__ == "__main__":
     print(f"Risk -> {args.risk}")
 
     api = FinancialModelingPrep()
-    model = DiscountedCashFlowModel(args.return_percentage, args.years_to_project, args.risk)
+    model = DiscountedCashFlowModel(
+        args.return_percentage,  
+        args.years_to_project, 
+        args.risk, 
+        args.perpetual_growth_rate, 
+        args.margin_of_safety
+    )
 
     for tick in args.ticks:
         print(f"Analyzing ticker symbol {tick}")

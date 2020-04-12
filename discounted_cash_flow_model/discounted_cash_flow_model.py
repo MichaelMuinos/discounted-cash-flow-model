@@ -2,12 +2,44 @@ from financial_modeling_prep.constants import Constants
 from risk import Risk
 
 class DiscountedCashFlowModel:
-    def __init__(self, return_percentage, years_to_project, risk):
+    def __init__(self, return_percentage, years_to_project, risk, perpetual_growth_rate, margin_of_safety):
         self.return_percentage = return_percentage
         self.years_to_project = years_to_project
         self.risk = risk
+        self.perpetual_growth_rate = perpetual_growth_rate
+        self.margin_of_safety = margin_of_safety
 
     def calculate(self, symbol, financials, quotes):
+        """
+        Performs the DCF model for a specific company using historical and current
+        financial data.
+
+        Parameters
+        ----------
+        symbol : str
+            ticker symbol
+        
+        financials : dict
+            dictionary holding all financial data for the ticker symbol
+
+            structure of the dict:
+            {
+                "income_statement": {...},
+                "balance_sheet": {...},
+                "cash_flow_statement: {...}
+            }
+
+        quotes : dict
+            dictionary holding all quote data for the ticker symbol.
+
+            structure of dict can be found in `financial_modeling_api.constants.Constants.QUOTES`
+        
+        Returns
+        -------
+        float, float
+            first return is the fair value
+            second return is the fair value with a margin of safety applied to it
+        """
         # step 1 : combine revenue, net income, and free cash flow
         metrics = self._combine_metrics(financials)
 
@@ -23,7 +55,21 @@ class DiscountedCashFlowModel:
         # step 5 : apply calculated percentages from step 2, 3, and 4 to estimate future revenue, net income, and free cash flow
         future_metrics = self._estimate_future_metrics(metrics, free_cash_flow_rate_percentage, revenue_growth_rate, net_income_margins_percentage)
 
-    def _combine_metrics(financials):
+        # step 6 : calculate our terminal value
+        terminal_value = self._calculate_terminal_value(future_metrics[-1])
+
+        # step 7 : calculate and sum the present value of future cash flow to get today's value
+        today_value = self._calculate_today_value(future_metrics, terminal_value)
+
+        # step 8 : calculate fair value
+        fair_value = self._calculate_fair_value(quotes, today_value)
+
+        # step 9 : apply our margin of safety
+        fair_with_margin_of_safety = self._apply_margin_of_safety(fair_value)
+
+        return fair_value, fair_with_margin_of_safety
+
+    def _combine_metrics(self, financials):
         """
         Combines the revenue, net income, and free cash flow using the income
         and cash flow statement.
@@ -350,12 +396,181 @@ class DiscountedCashFlowModel:
             return future_metrics
 
         # get future revenues
-        future_revenue = _calculate_future_revenue(matrix, revenue_growth_rate, self.years_to_project, self._apply_percentage)
+        future_revenue = _calculate_future_revenue(matrix, revenue_growth_rate, self.years_to_project, self._add_percentage)
 
         # from future revenues, calculate future net income / free cash flow
         return _calculate_future_net_income_and_free_cash_flow(future_revenue, free_cash_flow_rate_percentage, net_income_margins_percentage)
 
+    def _calculate_terminal_value(self, last_future_metric):
+        """
+        Calculate the terminal value based on the last future estimated
+        free cash flow.
+
+        TV = (FCF * (1 + g)) / (r - g), where
+        FCF = last estimated free cash flow, 
+        g = perpetual growth rate, 
+        r = required rate of return
+
+        Parameters
+        ----------
+        last_future_metric : dict
+            dictionary containing the future year, revenue, net income, and free cash flow
+
+            structure of dict:
+            {
+                "year": 2019,
+                "revenue": 2000,
+                "net_income": 1000,
+                "free_cash_flow": 1500
+            }
+
+        Returns
+        -------
+        float
+            the terminal value based off of the last free cash flow
+        """
+        fcf = last_future_metric["free_cash_flow"]
+        g = float(self.perpetual_growth_rate / 100)
+        r = float(self.required_rate_of_return / 100)
+
+        return (fcf * (1 + g)) / (r - g)
+            
+    def _calculate_today_value(self, future_metrics, terminal_value):
+        """
+        Calculate today's value for the company. We must apply a discount factor
+        for each future cash flow, then sum up all present value of future cash flow.
+
+        DF = (1 + r) ^ t, where
+        r = required rate of return
+        t = year in the future -> 1 <= t <= `self.years_to_project`
+
+        PV = FCF / DF
+
+        Parameters
+        ----------
+        future_metrics : array<dict>
+            An aggregation of FUTURE revenue, net income, and free cash flow.
+
+            structure of array:
+            [
+                {
+                    "year": 2019,
+                    "revenue": 2000,
+                    "net_income": 1000,
+                    "free_cash_flow": 1500
+                },
+                ...
+            ]
+
+        terminal_value : float
+            terminal value based on last future free cash flow
+
+        Returns
+        -------
+        float
+            today's total value for the company, i.e. market cap
+        """
+        def _present_value(fcf, r, t):
+            """
+            Calculates the present value of free cash flow.
+
+            Parameters
+            ----------
+            fcf : float
+                free cash flow
+            r : float
+                required rate of return
+            t : int
+                time
+
+            Returns
+            -------
+            float
+                present value
+            """
+            def _discount_factor(r, t):
+                """
+                Calculates the discount factor.
+
+                Parameters
+                ----------
+                r : float
+                    required rate of return
+                t : float
+                    time
+
+                Returns
+                -------
+                float
+                    discount factor
+                """
+                return (1 + r) ** t
+            return fcf / _discount_factor(r, t)
+
+        r = float(self.required_rate_of_return / 100)
+
+        # must sum our future estimates AND terminal value discounted
+        present_values_future_fcf = sum([_present_value(metric["free_cash_flow"], r, i + 1) for i, metric in enumerate(future_metrics)])
+        present_value_terminal = _present_value(terminal_value, r, len(future_metrics))
+
+        # return today's value
+        return present_values_future_fcf + present_value_terminal
+
+    def _calculate_fair_value(self, quotes, today_value):
+        """
+        Calculates the fair value for the company.
+        FV = shares / value
+
+        Parameters
+        ----------
+        quotes : dict
+            dictionary holding all quote data for the ticker symbol.
+
+            structure of dict can be found in `financial_modeling_api.constants.Constants.QUOTES`
+
+        Returns
+        -------
+        float
+            fair value for the company
+        """
+        shares_outstanding = quotes[Constants.QUOTES.SHARES_OUTSTANDING]
+        return float(today_value / shares_outstanding)
+
+    def _apply_margin_of_safety(self, fair_value):
+        """
+        Applies a margin of safety to the fair value calculation.
+
+        Parameters
+        ----------
+        fair_value : float
+            fair value of the company
+
+        Returns
+        -------
+        float
+            fair value accounted by the margin of safety
+        """
+        margin_of_safety = float(self.margin_of_safety / 100)
+        return self._subtract_percentage(fair_value, margin_of_safety)
+
     def _choose_percentage_based_on_risk(percentages):
+        """
+        Determines the percentage to use based on `self.risk`.
+        
+        `Conservative` risk means taking the minimum.
+        `Moderate` risk means taking the average.
+        `Bullish` risk means taking the maximum.
+
+        Parameters
+        ----------
+        percentages : array<float>
+            array representing percentages
+        
+        Returns
+        -------
+        float
+            percentage to be used for calculation from caller
+        """
         if self.risk == Risk.CONSERVATIVE:
             # grab the minimum percentage change
             return min(percentages)
@@ -366,8 +581,58 @@ class DiscountedCashFlowModel:
             # bullish estimate requires the maximum percentage change
             return max(percentages)
 
-    def _apply_percentage(self, num, percentage):
-        return float(num * percentage + num)
+    def _add_percentage(self, num, percentage):
+        """
+        Adds the percentage change to the original number.
+
+        Parameters
+        ----------
+        num : float
+            number to be added to the percentage change
+
+        percentage : float
+            float value to be applied to the number
+
+        Returns
+        -------
+        float
+            added percentage change of `num`
+        """
+        return float(num + (num * percentage))
+
+    def _subtract_percentage(self, num, percentage):
+        """
+        Subtracts the percentage change to the original number.
+
+        Parameters
+        ----------
+        num : float
+            number to be subtracted to the percentage change
+
+        percentage : float
+            float value to be applied to the number
+
+        Returns
+        -------
+        float
+            subtracted percentage change of `num`
+        """
+        return (num - (num * percentage))
 
     def _percentage_change(self, old, new):
+        """
+        Calculates the percentage change between two numbers.
+
+        Parameters
+        ----------
+        old : float
+            original number
+        new : float
+            new number
+        
+        Returns
+        -------
+        float
+            percentage change from `old` to `new`
+        """
         return float((new - old) / old)
