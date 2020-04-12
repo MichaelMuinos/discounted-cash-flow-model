@@ -2,7 +2,7 @@ import requests
 
 class FinancialModelingPrep:
     def __init__(self):
-        self.base_url = "financialmodelingprep.com"
+        self.base_url = "https://financialmodelingprep.com"
 
     def get_quotes(self, symbol):
         """
@@ -15,18 +15,19 @@ class FinancialModelingPrep:
 
         Returns
         -------
-        dict
-            dictionary holding all quote data for the ticker symbol.
+        array<dict> of size 1
+            dictionary holding all quote data for the ticker symbol. For some reason,
+            the api returns an array always of size 1.
 
             structure of dict can be found in `financial_modeling_api.constants.Constants.QUOTES`
         """
-        url = f"{self._version}quote/{symbol.upper()}"
+        url = f"{self._version()}quote/{symbol.upper()}"
 
         quote_response, err = self._call_api(url)
         if err:
             raise Exception(f"Failed to fetch quote data for ticker symbol {symbol}.")
 
-        return quote_response.json()
+        return quote_response
 
     def get_financials(self, symbol, minimum_years):
         """
@@ -124,7 +125,7 @@ class FinancialModelingPrep:
         str
             base url + version + financials
         """
-        return self._version + "/financials/"
+        return self._version() + "/financials/"
 
     def _call_api(self, url):
         """
@@ -162,7 +163,7 @@ class FinancialModelingPrep:
             dict represents the json response coming from the api call. if there is an error, this will be None.
             Exception is an error object where if the api call is successful, this will be none
         """
-        url = f"{self._financials}income-statement/{symbol.upper()}"
+        url = f"{self._financials()}income-statement/{symbol.upper()}"
         return self._call_api(url)
 
     def _get_balance_sheet(self, symbol):
@@ -180,7 +181,7 @@ class FinancialModelingPrep:
             dict represents the json response coming from the api call. if there is an error, this will be None.
             Exception is an error object where if the api call is successful, this will be none
         """
-        url = f"{self._financials}balance-sheet-statement/{symbol.upper()}"
+        url = f"{self._financials()}balance-sheet-statement/{symbol.upper()}"
         return self._call_api(url)
 
     def _get_cash_flow_statement(self, symbol):
@@ -198,6 +199,6 @@ class FinancialModelingPrep:
             dict represents the json response coming from the api call. if there is an error, this will be None.
             Exception is an error object where if the api call is successful, this will be none
         """
-        url = f"{self._financials}cash-flow-statement/{symbol.upper()}"
+        url = f"{self._financials()}cash-flow-statement/{symbol.upper()}"
         return self._call_api(url)
 

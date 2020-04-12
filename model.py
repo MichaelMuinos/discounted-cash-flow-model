@@ -24,24 +24,24 @@ class RiskAction(argparse.Action):
         setattr(namespace, self.dest, values)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Use the DCF model for various companies.')
+    parser = argparse.ArgumentParser(description='Use the DCF model to calculate fair value for various companies.')
     parser.add_argument('--ticks', nargs='+', help='Specify ticker symbols (1 or more).', required=True)
     parser.add_argument('--minimum_years', action=IntegerAction, help='Specify the minimum amount of years of data points needed to perform the DCF calculation.', type=int, default=4)
     parser.add_argument('--years_to_project', action=IntegerAction, help='Specify the number of years to project future earnings.', type=int, default=4)
     parser.add_argument('--return_percentage', action=FloatAction, help='Specify the required rate of return in terms of a percentage.', type=float, default=8.0)
-    parser.add_argument('--perpetual_growth_rate', action=FloatAction, help='Perpetual growth rate is the rate at which the free cash flow will grow forever. This number will drastically change the fair value.', type=float, default=2.5)
-    parser.add_argument('--margin_of_safety', action=FloatAction, help='Specify the margin of safety to be applied after the fair value is calculated.', type=float, default=50.0)
-    parser.add_argument('--risk', action=RiskAction, help='Specify the level of rick you would like to take. Choose between `conservative`, `moderate`, or `bullish`.', default='moderate')
+    parser.add_argument('--perpetual_growth_rate', action=FloatAction, help='Perpetual growth rate is the rate at which the free cash flow will grow forever. This number will drastically change the fair value, thus the default is the growth rate of GDP.', type=float, default=2.5)
+    parser.add_argument('--margin_of_safety', action=FloatAction, help='Specify the margin of safety in terms of a percentage to be applied after the fair value is calculated.', type=float, default=50.0)
+    parser.add_argument('--risk', action=RiskAction, help='Specify the level of risk you would like to take. Choose between `conservative`, `moderate`, or `bullish`.', default='conservative')
     args = parser.parse_args()
 
     print("--------- INPUT ARGUMENTS ---------")
-    print(f"Ticker symbols -> {'\t'.join(args.ticks)}")
+    print(f"Ticker symbols -> {args.ticks}")
     print(f"Minimum amount of years of data -> {args.minimum_years} {'year' if args.minimum_years == 1 else 'years'}")
     print(f"Number of years to project future earnings -> {args.years_to_project} {'year' if args.years_to_project == 1 else 'years'}")
     print(f"Required rate of return -> {args.return_percentage} %")
     print(f"Perpetual growth rate -> {args.perpetual_growth_rate} %")
     print(f"Margin of safety -> {args.margin_of_safety} %")
-    print(f"Risk -> {args.risk}")
+    print(f"Risk -> {args.risk}\n")
 
     api = FinancialModelingPrep()
     model = DiscountedCashFlowModel(
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     )
 
     for tick in args.ticks:
-        print(f"Analyzing ticker symbol {tick}")
+        print(f"Analyzing ticker symbol {tick}...")
 
         print("Fetching financial statements...")
         financials = api.get_financials(tick, args.minimum_years)
@@ -64,4 +64,4 @@ if __name__ == "__main__":
         print("Calculating DCF...")
         fair_value, fair_value_with_margin_of_safety = model.calculate(tick, financials, quotes)
 
-        print(f"Fair value -> ${fair_value}\nFair value w/ margin of safety -> ${fair_value_with_margin_of_safety}")
+        print(f"Fair value -> ${round(fair_value, 2)}\nFair value w/ margin of safety -> ${round(fair_value_with_margin_of_safety, 2)}\n")

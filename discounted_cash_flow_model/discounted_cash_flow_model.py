@@ -1,9 +1,9 @@
 from financial_modeling_prep.constants import Constants
-from risk import Risk
+from .risk import Risk
 
 class DiscountedCashFlowModel:
-    def __init__(self, return_percentage, years_to_project, risk, perpetual_growth_rate, margin_of_safety):
-        self.return_percentage = return_percentage
+    def __init__(self, required_rate_of_return, years_to_project, risk, perpetual_growth_rate, margin_of_safety):
+        self.required_rate_of_return = required_rate_of_return
         self.years_to_project = years_to_project
         self.risk = risk
         self.perpetual_growth_rate = perpetual_growth_rate
@@ -29,8 +29,9 @@ class DiscountedCashFlowModel:
                 "cash_flow_statement: {...}
             }
 
-        quotes : dict
-            dictionary holding all quote data for the ticker symbol.
+        quotes : array<dict> of size 1
+            dictionary holding all quote data for the ticker symbol. For some reason,
+            the api returns an array always of size 1.
 
             structure of dict can be found in `financial_modeling_api.constants.Constants.QUOTES`
         
@@ -128,14 +129,14 @@ class DiscountedCashFlowModel:
             date = income_year[Constants.INCOME_STATEMENT.DATE]
             year = int(date.split("-")[0])
 
-            revenue = float(income_statement[Constants.INCOME_STATEMENT.REVENUE])
-            net_income = float(income_statement[Constants.INCOME_STATEMENT.NET_INCOME])
+            revenue = float(income_year[Constants.INCOME_STATEMENT.REVENUE])
+            net_income = float(income_year[Constants.INCOME_STATEMENT.NET_INCOME])
             free_cash_flow = _calculate_free_cash_flow(cash_flow_year)
 
             metrics.append({"year" : year, "revenue" : revenue, "net_income" : net_income, "free_cash_flow" : free_cash_flow })
 
         # ensure it is sorted in ascending order by year
-        return sorted(metrics, lambda x : x["year"])
+        return sorted(metrics, key=lambda x : x["year"])
 
     def _calculate_free_cash_flow_rate(self, metrics):
         """
@@ -396,7 +397,7 @@ class DiscountedCashFlowModel:
             return future_metrics
 
         # get future revenues
-        future_revenue = _calculate_future_revenue(matrix, revenue_growth_rate, self.years_to_project, self._add_percentage)
+        future_revenue = _calculate_future_revenue(metrics, revenue_growth_rate, self.years_to_project, self._add_percentage)
 
         # from future revenues, calculate future net income / free cash flow
         return _calculate_future_net_income_and_free_cash_flow(future_revenue, free_cash_flow_rate_percentage, net_income_margins_percentage)
@@ -523,8 +524,9 @@ class DiscountedCashFlowModel:
 
         Parameters
         ----------
-        quotes : dict
-            dictionary holding all quote data for the ticker symbol.
+        quotes : array<dict> of size 1
+            dictionary holding all quote data for the ticker symbol. For some reason,
+            the api returns an array always of size 1.
 
             structure of dict can be found in `financial_modeling_api.constants.Constants.QUOTES`
 
@@ -533,7 +535,7 @@ class DiscountedCashFlowModel:
         float
             fair value for the company
         """
-        shares_outstanding = quotes[Constants.QUOTES.SHARES_OUTSTANDING]
+        shares_outstanding = quotes[0][Constants.QUOTES.SHARES_OUTSTANDING]
         return float(today_value / shares_outstanding)
 
     def _apply_margin_of_safety(self, fair_value):
@@ -553,7 +555,7 @@ class DiscountedCashFlowModel:
         margin_of_safety = float(self.margin_of_safety / 100)
         return self._subtract_percentage(fair_value, margin_of_safety)
 
-    def _choose_percentage_based_on_risk(percentages):
+    def _choose_percentage_based_on_risk(self, percentages):
         """
         Determines the percentage to use based on `self.risk`.
         
