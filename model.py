@@ -62,4 +62,6 @@ if __name__ == "__main__":
         quotes = api.get_quotes(tick)
 
         print("Calculating DCF...")
-        data = model.calculate(tick, financials, quotes)
+        fair_value, fair_value_with_margin_of_safety = model.calculate(tick, financials, quotes)
+
+        print(f"Fair value -> ${fair_value}\nFair value w/ margin of safety -> ${fair_value_with_margin_of_safety}")
