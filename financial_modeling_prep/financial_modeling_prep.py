@@ -37,7 +37,7 @@ class FinancialModelingPrep:
 
         return quote_response
 
-    def get_financials(self, symbol, minimum_years):
+    def get_financials(self, symbol, minimum_years, maximum_years):
         """
         Fetches the income, balance, and cash flow statement 
         using the given ticket symbol.
@@ -87,6 +87,46 @@ class FinancialModelingPrep:
                 true if we have enough data, false otherwise
             """
             return len(data["financials"]) >= minimum_years
+        
+        def _cut_data_to_maximum_years(maximum_years, data):
+            """
+            Cuts the data to the maximum amount of years specified.
+
+            Parameters
+            ----------
+            maximum_years : int
+                max years of historical data to use
+
+            data : dict
+                financial data from api call
+
+                structure of dict:
+                {
+                    "symbol": "AAPL",
+                    "financials": [
+                        {...},
+                        ...
+                    ]
+                }
+
+            Returns
+            -------
+            dict
+                data input modified
+
+                structure of dict:
+                {
+                    "symbol": "AAPL",
+                    "financials": [
+                        {...},
+                        ...
+                    ]
+                }
+            """
+            financials = data["financials"]
+            cut_financials = financials[:maximum_years] if maximum_years < len(financials) else financials
+            data["financials"] = cut_financials
+            return data
 
         self.logger.debug("--- FinancialModelingPrep.get_financials ---")
 
@@ -97,27 +137,27 @@ class FinancialModelingPrep:
             raise Exception(f"Failed to fetch income statement for ticker symbol {symbol}.")
         if not _has_more_than_minimum(minimum_years, income_statement_response):
             raise Exception(f"Not enough data found in the income statement for ticker symbol {symbol}.")
-        financials["income_statement"] = income_statement_response
+        financials["income_statement"] = _cut_data_to_maximum_years(maximum_years, income_statement_response)
         
-        self.logger.debug(f"income_statement_response -> {json.dumps(income_statement_response, indent=2)}\n")
+        self.logger.debug(f"income_statement_response -> {json.dumps(financials['income_statement'], indent=2)}\n")
 
         balance_sheet_response, balance_err = self._get_balance_sheet(symbol)
         if balance_err:
             raise Exception(f"Failed to fetch balance sheet for ticker symbol {symbol}")
         if not _has_more_than_minimum(minimum_years, balance_sheet_response):
             raise Exception(f"Not enough data found in the balance sheet for ticker symbol {symbol}.")
-        financials["balance_sheet"] = balance_sheet_response
+        financials["balance_sheet"] = _cut_data_to_maximum_years(maximum_years, balance_sheet_response)
 
-        self.logger.debug(f"balance_sheet_response -> {json.dumps(balance_sheet_response, indent=2)}\n")
+        self.logger.debug(f"balance_sheet_response -> {json.dumps(financials['balance_sheet'], indent=2)}\n")
 
         cash_flow_statement_response, cash_flow_err = self._get_cash_flow_statement(symbol)
         if cash_flow_err:
             raise Exception(f"Failed to fetch cash flow statement for ticker symbol {symbol}")
         if not _has_more_than_minimum(minimum_years, cash_flow_statement_response):
             raise Exception(f"Not enough data found in the cash flow statement for ticker symbol {symbol}.")
-        financials["cash_flow_statement"] = cash_flow_statement_response
+        financials["cash_flow_statement"] = _cut_data_to_maximum_years(maximum_years, cash_flow_statement_response)
 
-        self.logger.debug(f"cash_flow_statement_response -> {json.dumps(cash_flow_statement_response, indent=2)}\n")
+        self.logger.debug(f"cash_flow_statement_response -> {json.dumps(financials['cash_flow_statement'], indent=2)}\n")
 
         return financials
 
